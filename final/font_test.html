@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+
+<html>
+
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Scene</title>
+    <script src="https://cdn.jsdelivr.net/gh/mrdoob/three.js@r114/build/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/gh/mrdoob/three.js@r114/examples/js/controls/OrbitControls.js"></script>
+    <script src="../js/myThree2020.js"></script>
+    <script src="../js/myGameCharacter.js"></script>
+    <link rel="stylesheet" type="text/css" href="../css/common.css">
+</head>
+
+<body>
+    <div id="screen" class="screen">
+        <div id="glView" style="position: relative;height: 100%;">
+            <!--textarea id="debugText" rows="8" cols="20" class="debugText" style="display: none;">Debug output</textarea> デバッグ用表示を無くしたいときはこちらを有効にする。-->
+            <textarea id="debugText" rows="12" cols="30" class="debugText">Debug output</textarea>
+        </div>
+    </div>
+    <script>
+        function init() {
+            /* 主要な HTML 要素の取得 */
+            const divScreen = document.getElementById("screen");
+            const divGlView = document.getElementById("glView");
+            const taDebugText = document.getElementById("debugText");
+
+            /* デバッグ用の出力 */
+            const AUTO_SCROLL_DEBUG = false; // taDebugText を常に最新の行までスクロールさせるかどうか。
+            taDebugText.value = ("ViewPort: " + window.innerWidth + "," + window.innerHeight + "\n");
+            /* ↓↓↓work11～work12 の追記場所↓↓↓ */
+
+            /* ↑↑↑work11～work12 の追記場所↑↑↑ */
+
+            /* THREE.js の初期化 */
+            const [scene, camera, renderer, clock, axes] = mylib2020.initThreeInElement(divGlView);
+            camera.position.set(5, 5, 5);
+
+            /* 平面の生成 */
+            /* ↓↓↓work17 の修正場所↓↓↓ */
+            const plane = new THREE.Mesh(new THREE.PlaneGeometry(100, 100), new THREE.MeshPhongMaterial({ color: 0xCCFFCC }));
+            /* ↑↑↑work17 の追記場所↑↑↑ */
+            plane.rotateX(THREE.Math.degToRad(-90)); /* X 軸中心に90度回転 */
+            plane.receiveShadow = true; /* 他の物体の影が落ちる */
+            scene.add(plane);
+
+            /* 球体の生成 */
+            /* ↓↓↓work17 の修正場所↓↓↓ */
+            const sphere = new THREE.Mesh(new THREE.SphereGeometry(0.5, 20, 20), new THREE.MeshPhongMaterial({ color: 0x0000FF, wireframe: false }));
+            /* ↑↑↑work17 の追記場所↑↑↑ */
+            sphere.position.set(3, 3, 3); /* 座標(3,3,3)に移動 */
+            sphere.castShadow = true; /* 他の物体に影を落とす */
+            scene.add(sphere);
+            /* ↓↓↓work13 の追記場所↓↓↓ */
+            sphere.position.set(10, 0, 0);  // 物体の位置（ position ）に x, y, z の値をセットするコード。
+            //sphere.position.x = 10; // 軸ごとの指定もできる。
+            //sphere.position.y = 0;
+            /* ↑↑↑work13 の追記場所↑↑↑ */
+
+            /* 立方体の生成 */
+            /* ↓↓↓work17 の追記・修正場所↓↓↓ */
+            const cubeGeometry = new THREE.BoxGeometry(3, 3, 3); /* Geometry の生成を分けて書くこともできる */
+            const cubeMaterial = new THREE.MeshPhongMaterial({ color: 0xFF0000 }); /* Material の生成を分けて書くこともできる */
+            const cube = new THREE.Mesh(cubeGeometry, cubeMaterial);
+            /* ↑↑↑work17 の追記・修正場所↑↑↑ */
+            /* ↓↓↓work18 の追記・修正場所↓↓↓ */
+            cube.castShadow = true; /* 他の物体に影を落とす */
+            cube.receiveShadow = true; /* 他の物体から影が落ちる */
+            //scene.add(cube);
+            /* ↑↑↑work18 の追記・修正場所↑↑↑ */
+            /* ↓↓↓work14～work15 の追記場所↓↓↓ */
+
+            /* ↑↑↑work14～work15 の追記場所↑↑↑ */
+
+            /* 平行光源の生成 */
+            /* ↓↓↓work16 の修正場所↓↓↓ */
+            const directionalLight = new THREE.DirectionalLight(0xFFFFFF, 1.0); /* 色は白、強さは 1.0 */
+            directionalLight.castShadow = true; /* 他の物体に影を落とす */
+            directionalLight.position.set(5, 5, 5);        /* 座標(5,5,5)から */
+            directionalLight.target.position.set(0, 0, 0); /* 座標(0,0,0)に照射 */
+            scene.add(directionalLight);        /* ライト本体と */
+            scene.add(directionalLight.target); /* 照射ターゲットもシーンに追加する必要がある */
+            /* ↑↑↑work16 の修正場所↑↑↑ */
+
+            // FontLoaderインスタンスの作成
+            const fontLoader = new THREE.FontLoader();
+            let nomifont0 = null;
+            let textGeometry = null;
+            // フォントのロード
+            fontLoader.load('../assets/fonts/helvetiker_regular.typeface.json', function (font) {
+                console.log("loaded");
+                // テキストオブジェクトの作成
+                // 第1引数に作成する文字を指定し、あとはパラメータ
+                // font: 使用するフォント（typeface.jsで作成されたフォント）
+                // size: テキストサイズ
+                // height: テキストの奥行き
+                // curveSegments: 曲線に使用する点の数
+                // bevelEnabled: 斜体にするかどうか
+                // bevelThickness: 斜体の傾き度
+                // bevelSize: アウトラインからどの程度傾けるか
+                nomifont0 = font;
+                textGeometry = new THREE.TextGeometry('ABC', {
+                    font: nomifont0,
+                    size: 10.0,
+                    height: 5,
+                    curveSegments: 10,
+                    bevelThickness: 3,
+                    bevelSize: 1.0,
+                    bevelEnabled: true
+                });
+                // ジオメトリを中心に移動
+                textGeometry.center();
+                // オブジェクトの作成
+                const text = new THREE.Mesh(textGeometry, new THREE.MeshBasicMaterial({ color: 0x00ff00 }));
+                // オブジェクトをシーンに追加
+                scene.add(text);
+            });
+            /* マウスコントローラの追加 */
+            /* THREE.js 本体には含まれていないことに注意 */
+            const orbitControls = new THREE.OrbitControls(camera, renderer.domElement);
+            orbitControls.update();
+
+            /* アニメーションのための描画更新処理 */
+            function renderFrame() {
+                const deltaTime = clock.getDelta(); /* 前フレームからの経過時間。物体の移動に使う。 */
+                orbitControls.update(deltaTime);
+                /* ↓↓↓work15 の追記場所↓↓↓ */
+
+                /* ↑↑↑work15 の追記場所↑↑↑ */
+                renderer.render(scene, camera);
+                requestAnimationFrame(renderFrame);
+                if (AUTO_SCROLL_DEBUG) {
+                    taDebugText.scrollTop = taDebugText.scrollHeight;
+                }
+            }
+            renderFrame();
+
+            /* 画面サイズ変更時の処理 */
+            window.addEventListener('resize', function () {
+                taDebugText.value += ("ViewPort: " + window.innerWidth + "," + window.innerHeight + "\n");
+                const glViewSize = divGlView.getBoundingClientRect();
+                renderer.setSize(glViewSize.width, glViewSize.height);
+                camera.aspect = glViewSize.width / glViewSize.height;
+                camera.updateProjectionMatrix();
+            });
+        }
+        window.addEventListener('load', init);
+    </script>
+</body>

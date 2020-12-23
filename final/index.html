@@ -1,0 +1,727 @@
+<!DOCTYPE html>
+
+<html>
+
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Scene</title>
+    <script src="https://cdn.jsdelivr.net/gh/mrdoob/three.js@r114/build/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/gh/mrdoob/three.js@r114/examples/js/controls/OrbitControls.js"></script>
+    <script src="../js/myThree2020.js"></script>
+    <script src="../js/myGameCharacter.js"></script>
+    <script src="../js/myMaze.js"></script>
+    <script src="https://cdn.jsdelivr.net/gh/mrdoob/three.js@r114/examples/js/loaders/GLTFLoader.js"></script>
+    <script src="../js/myAmmo2020.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.2.4/gsap.min.js"></script>
+    <!-- 3Dテキスト表示用のフォント読み込み -->
+
+    
+    <script
+        src="https://cdn.jsdelivr.net/gh/kripken/ammo.js@aab297a4164779c3a9d8dc8d9da26958de3cb778/builds/ammo.js"></script>
+
+
+    <link rel="stylesheet" type="text/css" href="../css/common.css">
+</head>
+
+<body>
+    <div id="screen" class="screen">
+        <!-- ↓↓↓work31の追記・修正場所↓↓↓ -->
+        <div id="glView" style="position: relative;height: 55%;">
+            <!--textarea id="debugText" rows="8" cols="20" class="debugText" style="display: none;">Debug output</textarea> デバッグ用表示を無くしたいときはこちらを有効にする。-->
+            <textarea id="debugText" rows="8" cols="20" class="debugText">Debug output</textarea>
+            <button id="startButton" class="startButton">
+                Click to Play
+            </button>
+        </div>
+        <div id="info" style="position: relative;height: 15%;background-color:coral;">
+            <div id="status" class="status" style="width: 20%;">主人公ステータス</div>
+            <textarea id="message" class="message" style="left: 20%;width: 78%"></textarea>
+        </div>
+        <div id="controller" style="position: relative;height: 20%;background-color:rgb(48, 55, 59)">
+            <div id="up" class="gameButton"
+                style="top: 10%; left: 16%; height: 43px; background-image:url(../assets/gray_arrow.png);">
+            </div>
+            <div id="down" class="gameButton"
+                style="top: 70%; left: 16%; height: 43px; background-image:url(../assets/gray_arrow.png); transform: rotate(180deg)">
+            </div>
+            <div id="left" class="gameButton"
+                style="top: 40%; left: 5%; height: 43px; background-image:url(../assets/gray_arrow.png); transform: rotate(-90deg)">
+            </div>
+            <div id="right" class="gameButton"
+                style="top: 40%; left: 27%; height: 43px; background-image:url(../assets/gray_arrow.png); transform: rotate(90deg)">
+            </div>
+
+            <button id="tansaku" type="button" class="pushButton"
+                style="height: 65%; width: 22%;top: 26%; right: 15%; border-radius:50px ; background-color: rgb(28, 1, 41); color: antiquewhite;"
+                value="0">
+                探る
+            </button>
+        </div>
+
+
+        <div id="Choice" style="position: relative;height: 15%;background-color:rgb(48, 55, 59)">
+            <button id="choice1" type="button" class="pushButton2"
+                style="height: 40%; width: 15%;top: 20%; left: 13%; border-radius:50px ; background-color: rgb(90, 3, 3); color: antiquewhite;"
+                value="1">
+                1
+            </button>
+
+            <button id="choice2" type="button" class="pushButton2"
+                style="height: 40%; width: 15%;top: 20%; left: 33%; border-radius:50px ; background-color: rgb(90, 3, 3); color: antiquewhite;"
+                value="2">
+                2
+            </button>
+
+            <button id="choice3" type="button" class="pushButton2"
+                style="height: 40%; width: 15%;top: 20%; left: 53%; border-radius:50px ; background-color: rgb(90, 3, 3); color: antiquewhite;"
+                value="3">
+                3
+            </button>
+
+            <button id="choice4" type="button" class="pushButton2"
+                style="height: 40%; width: 15%;top: 20%; left: 73%; border-radius:50px ; background-color: rgb(90, 3, 3); color: antiquewhite;"
+                value="4">
+                4
+            </button>
+        </div>
+
+
+
+
+        <!-- ↑↑↑work31の追記・修正場所↑↑↑ -->
+
+        <script>
+
+            var btn = document.getElementById('startButton');
+            btn.addEventListener('click',
+                function init() {
+                    /* 主要な HTML 要素の取得 */
+                    const divScreen = document.getElementById("screen");
+                    const divGlView = document.getElementById("glView");
+                    const taDebugText = document.getElementById("debugText");
+                    divGlView.removeChild(document.getElementById('startButton'));
+                    /* デバッグ用の出力 */
+                    const AUTO_SCROLL_DEBUG = true; // taDebugText を常に最新の行までスクロールさせるかどうか。
+                    taDebugText.value = ("ViewPort: " + window.innerWidth + "," + window.innerHeight + "\n");
+
+                    /* THREE.js の初期化 */
+                    const [scene, camera, renderer, clock, axes] = mylib2020.initThreeInElement(divGlView);
+
+                    Ammo();
+                    const ammo = new mylib2020.AmmoManager(scene);
+
+                    const audioListener = new THREE.AudioListener();
+                    camera.add(audioListener);
+
+                    const bgm = new THREE.Audio(audioListener);
+                    new THREE.AudioLoader().load('../assets/sounds/desperate.mp3', function (buffer) {
+                        bgm.setBuffer(buffer);
+                        bgm.setLoop(true);
+                        bgm.play(); // ロード完了次第、ループ再生する。
+                    });
+
+                    /*机を生成*/
+                    let table = null;
+                    const modelUrl = "../assets/models/Table/scene.gltf";
+                    new THREE.GLTFLoader().load(modelUrl, // この関数は非同期的に実行される。
+                        function (gltf) { // モデルロードに成功
+                            table = gltf.scene;
+                            table.name = "Table";
+                            table.position.set(4.4, 0, 8);
+                            /* ロケットを囲むように衝突検出範囲を設定し、物理的属性を追加する。
+                             showCollision: 衝突検出範囲を可視化するか否か。
+                             scale: 衝突検出範囲の拡大縮小率。
+                             movable: ユーザプログラム側で移動させる可能性がある場合、true にする。
+                             mass: 重さ（0 にすると、他の物体が衝突しても動かない）
+                             friction: 摩擦
+                             restitution: 反発
+                             freezeRotationX/Y/Z: 指定した軸中心の回転をさせないようにする。
+                             angularDamping: 回転速度の減衰。デフォルトは 0（摩擦の影響だけで回転速度が減速する）。
+                            */
+                            ammo.collisionBuilder.addBoundingBoxRigidBody(table, {
+                                showCollision: false, scale: new THREE.Vector3(1, 0.7, 1),
+                                movable: true, mass: 5, friction: 0.9, restitution: 0.1, freezeRotationX: true, freezeRotationZ: true, angularDamping: 0.8
+                            });
+                            /* addBoundingSphereRigidBody など、他の衝突判定形状も試してみよう。
+                             scale や offset 、addBoundingCylinderRigidBody の場合は axis も変更してみよう。*/
+                            //ammo.collisionBuilder.addBoundingSphereRigidBody(table, { showCollision: true, scale: new THREE.Vector3(0.6, 1, 1), movable: true, mass: 100, friction: 0.1, freezeRotationX: true, freezeRotationZ: true, angularDamping: 0.8 });
+                            //ammo.collisionBuilder.addBoundingCylinderRigidBody(table, { showCollision: true, axis: "z", scale: new THREE.Vector3(0.4, 0.4, 1), offset: new THREE.Vector3(0, 0.5, 0), movable: true, mass: 100, friction: 0.9, restitution: 0.1, freezeRotationX: true, freezeRotationZ: true, angularDamping: 0.8 });
+                            /* ロケットを物理計算対象としてシーンに追加する */
+                            ammo.registerObject(table);
+                            table.scale.set(0.03, 0.03, 0.03) // x, y, zの縮尺
+                            table.rotateY(THREE.Math.degToRad(90));
+
+                            taDebugText.value += "Load:" + modelUrl + "\n";
+                        }, null, function (error) {
+                            taDebugText.value += "Failed to load:" + modelUrl + "\n";
+                        }
+                    );
+
+                    /*棚を生成*/
+                    let closet = null;
+                    const modelUrl2 = "../assets/models/closet/scene.gltf";
+                    new THREE.GLTFLoader().load(modelUrl2, // この関数は非同期的に実行される。
+                        function (gltf) { // モデルロードに成功
+                            closet = gltf.scene;
+                            closet.name = "Closet";
+                            closet.position.set(4.4, 0, 13.3);
+                            /* ロケットを囲むように衝突検出範囲を設定し、物理的属性を追加する。
+                             showCollision: 衝突検出範囲を可視化するか否か。
+                             scale: 衝突検出範囲の拡大縮小率。
+                             movable: ユーザプログラム側で移動させる可能性がある場合、true にする。
+                             mass: 重さ（0 にすると、他の物体が衝突しても動かない）
+                             friction: 摩擦
+                             restitution: 反発
+                             freezeRotationX/Y/Z: 指定した軸中心の回転をさせないようにする。
+                             angularDamping: 回転速度の減衰。デフォルトは 0（摩擦の影響だけで回転速度が減速する）。
+                            */
+                            ammo.collisionBuilder.addBoundingBoxRigidBody(closet, {
+                                showCollision: false, scale: new THREE.Vector3(1, 0.7, 1),
+                                movable: true, mass: 5, friction: 0.9, restitution: 0.1, freezeRotationX: true, freezeRotationZ: true, angularDamping: 0.8
+                            });
+                            /* addBoundingSphereRigidBody など、他の衝突判定形状も試してみよう。
+                             scale や offset 、addBoundingCylinderRigidBody の場合は axis も変更してみよう。*/
+                            //ammo.collisionBuilder.addBoundingSphereRigidBody(table, { showCollision: true, scale: new THREE.Vector3(0.6, 1, 1), movable: true, mass: 100, friction: 0.1, freezeRotationX: true, freezeRotationZ: true, angularDamping: 0.8 });
+                            //ammo.collisionBuilder.addBoundingCylinderRigidBody(table, { showCollision: true, axis: "z", scale: new THREE.Vector3(0.4, 0.4, 1), offset: new THREE.Vector3(0, 0.5, 0), movable: true, mass: 100, friction: 0.9, restitution: 0.1, freezeRotationX: true, freezeRotationZ: true, angularDamping: 0.8 });
+                            /* ロケットを物理計算対象としてシーンに追加する */
+                            ammo.registerObject(closet);
+                            closet.scale.set(0.013, 0.013, 0.013) // x, y, zの縮尺
+                            closet.rotateY(THREE.Math.degToRad(180));
+
+
+                            taDebugText.value += "Load:" + modelUrl + "\n";
+                        }, null, function (error) {
+                            taDebugText.value += "Failed to load:" + modelUrl + "\n";
+                        }
+                    );
+
+                    /*棚２の生成*/
+                    let closet2 = null;
+                    const modelUrl3 = "../assets/models/closet2/scene.gltf";
+                    new THREE.GLTFLoader().load(modelUrl3, // この関数は非同期的に実行される。
+                        function (gltf) { // モデルロードに成功
+                            closet2 = gltf.scene;
+                            closet2.name = "Closet2";
+                            closet2.position.set(7.3, 0, 8);
+                            /* ロケットを囲むように衝突検出範囲を設定し、物理的属性を追加する。
+                             showCollision: 衝突検出範囲を可視化するか否か。
+                             scale: 衝突検出範囲の拡大縮小率。
+                             movable: ユーザプログラム側で移動させる可能性がある場合、true にする。
+                             mass: 重さ（0 にすると、他の物体が衝突しても動かない）
+                             friction: 摩擦
+                             restitution: 反発
+                             freezeRotationX/Y/Z: 指定した軸中心の回転をさせないようにする。
+                             angularDamping: 回転速度の減衰。デフォルトは 0（摩擦の影響だけで回転速度が減速する）。
+                            */
+                            ammo.collisionBuilder.addBoundingBoxRigidBody(closet2, {
+                                showCollision: false, scale: new THREE.Vector3(1, 0.7, 1),
+                                movable: true, mass: 5, friction: 0.9, restitution: 0.1, freezeRotationX: true, freezeRotationZ: true, angularDamping: 0.8
+                            });
+                            /* addBoundingSphereRigidBody など、他の衝突判定形状も試してみよう。
+                             scale や offset 、addBoundingCylinderRigidBody の場合は axis も変更してみよう。*/
+                            //ammo.collisionBuilder.addBoundingSphereRigidBody(table, { showCollision: true, scale: new THREE.Vector3(0.6, 1, 1), movable: true, mass: 100, friction: 0.1, freezeRotationX: true, freezeRotationZ: true, angularDamping: 0.8 });
+                            //ammo.collisionBuilder.addBoundingCylinderRigidBody(table, { showCollision: true, axis: "z", scale: new THREE.Vector3(0.4, 0.4, 1), offset: new THREE.Vector3(0, 0.5, 0), movable: true, mass: 100, friction: 0.9, restitution: 0.1, freezeRotationX: true, freezeRotationZ: true, angularDamping: 0.8 });
+                            /* ロケットを物理計算対象としてシーンに追加する */
+                            ammo.registerObject(closet2);
+                            closet2.scale.set(0.015, 0.015, 0.015) // x, y, zの縮尺
+                            closet2.rotateY(THREE.Math.degToRad(-90));
+
+                            taDebugText.value += "Load:" + modelUrl + "\n";
+                        }, null, function (error) {
+                            taDebugText.value += "Failed to load:" + modelUrl3 + "\n";
+                        }
+                    );
+
+                    /*椅子の生成*/
+                    let chair = null;
+                    const modelUrl4 = "../assets/models/chair/scene.gltf";
+                    new THREE.GLTFLoader().load(modelUrl4, // この関数は非同期的に実行される。
+                        function (gltf) { // モデルロードに成功
+                            chair = gltf.scene;
+                            chair.name = "chair";
+                            chair.position.set(4.5, 0.4, 7.3);
+                            /* ロケットを囲むように衝突検出範囲を設定し、物理的属性を追加する。
+                             showCollision: 衝突検出範囲を可視化するか否か。
+                             scale: 衝突検出範囲の拡大縮小率。
+                             movable: ユーザプログラム側で移動させる可能性がある場合、true にする。
+                             mass: 重さ（0 にすると、他の物体が衝突しても動かない）
+                             friction: 摩擦
+                             restitution: 反発
+                             freezeRotationX/Y/Z: 指定した軸中心の回転をさせないようにする。
+                             angularDamping: 回転速度の減衰。デフォルトは 0（摩擦の影響だけで回転速度が減速する）。
+                            */
+                            ammo.collisionBuilder.addBoundingBoxRigidBody(chair, {
+                                showCollision: false, scale: new THREE.Vector3(1, 0.7, 1),
+                                movable: true, mass: 5, friction: 0.9, restitution: 0.1, freezeRotationX: true, freezeRotationZ: true, angularDamping: 0.8
+                            });
+                            /* addBoundingSphereRigidBody など、他の衝突判定形状も試してみよう。
+                             scale や offset 、addBoundingCylinderRigidBody の場合は axis も変更してみよう。*/
+                            //ammo.collisionBuilder.addBoundingSphereRigidBody(table, { showCollision: true, scale: new THREE.Vector3(0.6, 1, 1), movable: true, mass: 100, friction: 0.1, freezeRotationX: true, freezeRotationZ: true, angularDamping: 0.8 });
+                            //ammo.collisionBuilder.addBoundingCylinderRigidBody(table, { showCollision: true, axis: "z", scale: new THREE.Vector3(0.4, 0.4, 1), offset: new THREE.Vector3(0, 0.5, 0), movable: true, mass: 100, friction: 0.9, restitution: 0.1, freezeRotationX: true, freezeRotationZ: true, angularDamping: 0.8 });
+                            /* ロケットを物理計算対象としてシーンに追加する */
+                            ammo.registerObject(chair);
+                            chair.scale.set(1.3, 1.3, 1.3) // x, y, zの縮尺
+
+
+                            taDebugText.value += "Load:" + modelUrl4 + "\n";
+                        }, null, function (error) {
+                            taDebugText.value += "Failed to load:" + modelUrl4 + "\n";
+                        }
+                    );
+
+
+                    /*キャンドルの生成*/
+                    let candle = null;
+                    const modelUrl5 = "../assets/models/Candle/scene.gltf";
+                    new THREE.GLTFLoader().load(modelUrl5, // この関数は非同期的に実行される。
+                        function (gltf) { // モデルロードに成功
+                            candle = gltf.scene;
+                            candle.name = "candle";
+                            candle.position.set(5, 1, 8);
+                            scene.add(candle);
+                            candle.scale.set(0.15, 0.15, 0.15) // x, y, zの縮尺
+
+                            taDebugText.value += "Load:" + modelUrl5 + "\n";
+                        }, null, function (error) {
+                            taDebugText.value += "Failed to load:" + modelUrl5 + "\n";
+                        }
+                    );
+
+                    /*ランプの生成*/
+                    let light1 = null;
+                    const modelUrl6 = "../assets/models/light1/scene.gltf";
+                    new THREE.GLTFLoader().load(modelUrl6, // この関数は非同期的に実行される。
+                        function (gltf) { // モデルロードに成功
+                            light1 = gltf.scene;
+                            light1.name = "candle";
+                            light1.position.set(-0.1, -0.12, 0.3);
+
+                            scene.add(light1);
+                            scene.remove(light1);
+                            bodyy.add(light1);
+                            light1.scale.set(0.3, 0.3, 0.3) // x, y, zの縮尺
+
+
+                            taDebugText.value += "Load:" + modelUrl6 + "\n";
+                        }, null, function (error) {
+                            taDebugText.value += "Failed to load:" + modelUrl6 + "\n";
+                        }
+                    );
+
+
+
+
+
+                    /* 平面の生成 */
+                    const plane = new THREE.Mesh(new THREE.PlaneGeometry(100, 100), new THREE.MeshPhongMaterial({ color: 0xCCFFCC }));
+                    plane.rotateX(THREE.Math.degToRad(-90)); /* X 軸中心に90度回転 */
+                    plane.receiveShadow = true; /* 他の物体の影が落ちる */
+                    scene.add(plane);
+
+
+
+
+                    /*衝突判定に用いる四角 3つ*/
+                    const cubeGeometry5 = new THREE.BoxGeometry(2, 10, 1);
+                    const cubeMaterial5 = new THREE.MeshPhongMaterial({ color: 0xFF0000, transparent: true, opacity: 0 });
+                    const tableJudment = new THREE.Mesh(cubeGeometry5, cubeMaterial5);
+                    tableJudment.position.set(4.5, 0, 8);
+                    scene.add(tableJudment);
+
+                    const cubeGeometry6 = new THREE.BoxGeometry(0.5, 10, 3);
+                    const ClosetJudment = new THREE.Mesh(cubeGeometry6, cubeMaterial5);
+                    ClosetJudment.position.set(7.2, 1, 8);
+                    scene.add(ClosetJudment);
+
+                    const cubeGeometry7 = new THREE.BoxGeometry(2.6, 10, 0.5);
+                    const Closet2Judment = new THREE.Mesh(cubeGeometry7, cubeMaterial5);
+                    Closet2Judment.position.set(4.4, 1, 13.2);
+                    scene.add(Closet2Judment);
+
+
+
+                    /* 立方体の生成 */
+                    const cubeGeometry = new THREE.BoxGeometry(3, 4, 3); /* Geometry の生成を分けて書くこともできる */
+                    /* ↓↓↓work31の追記・修正場所↓↓↓ */
+                    const loader = new THREE.TextureLoader(); /* テクスチャをロードするための道具 */
+                    const mapTexture = loader.load("../assets/downloads/81mYuxbNKVL._AC_SX355_.jpg"); /* 指定されたURLからテクスチャをロード */
+                    const bumpTexture = loader.load("../assets/downloads/81mYuxbNKVL._AC_SX355_.jpg"); /* バンプマップ用テクスチャ */
+                    const cubeMaterial = new THREE.MeshPhongMaterial({ map: mapTexture, bumpMap: bumpTexture, bumpScale: 0.2 }); /* bumpMap:バンプテクスチャ、bumpScale:バンプマップの深さ */
+                    /* ↑↑↑work31の追記・修正場所↑↑↑ */
+                    const cube = new THREE.Mesh(cubeGeometry, cubeMaterial);
+                    cube.castShadow = true; /* 他の物体に影を落とす */
+                    cube.receiveShadow = true; /* 他の物体から影が落ちる */
+                    scene.add(cube);
+
+                    /* スポットライトの生成 */
+                    const spotLight = new THREE.SpotLight(0xFFFFFF, 1); /* 色は白、強さは 1.0 */
+                    spotLight.angle = THREE.Math.degToRad(45); /* 光源位置から画角90度の円錐状に光を発する */
+                    spotLight.penumbra = 0.6; /* 半影をどの程度生じさせるか。 */
+                    spotLight.castShadow = true; /* 他の物体に影を落とす */
+                    scene.add(spotLight); /* ライト本体と */
+                    scene.add(spotLight.target); /* 照射ターゲットもシーンに追加する必要がある */
+
+
+                    /* カメラ等の位置調整 */
+                    /* ↓↓↓work31の追記・修正場所↓↓↓ */
+                    cube.position.set(0, 1.5, 9); /* 最初にカメラに映るようにしているだけ */
+                    camera.position.set(0, 0, 0); /* bodyy からの相対位置 */
+                    camera.lookAt(0, -0.2, 1);
+                    spotLight.position.set(0, 0.3, 0); /* bodyy からの相対位置 */
+                    spotLight.target.position.set(0, -2, 2); /* bodyy からの相対位置 */
+
+                    /*身体の作成　球体に追加する*/
+                    const cubeGeometry2 = new THREE.BoxGeometry(1, 3, 1); /* Geometry の生成を分けて書くこともできる */
+                    const cubeMaterial2 = new THREE.MeshPhongMaterial({ color: 0xFF0000 }); /* Material の生成を分けて書くこともできる */
+                    const bodyy = new THREE.Mesh(cubeGeometry2, cubeMaterial2);
+                    bodyy.position.set(0, 0, 5);
+                    bodyy.add(new THREE.AxesHelper(5));
+                    ammo.collisionBuilder.addBoundingBoxRigidBody(bodyy, {
+                        showCollision: false, scale: new THREE.Vector3(1, 0.7, 1),
+                        movable: true, mass: 5, friction: 0.9, restitution: 0.1, freezeRotationX: true, freezeRotationZ: true, angularDamping: 0.8
+                    });
+                    ammo.registerObject(bodyy);
+
+
+
+                    /* 親子関係の構築 */
+                    scene.remove(camera);
+                    scene.remove(spotLight);
+                    scene.remove(spotLight.target);
+
+                    bodyy.add(camera);
+                    bodyy.add(spotLight);
+                    bodyy.add(spotLight.target);
+
+                    scene.remove(cube); /* cube はもう必要ない */
+                    const blocks = []; /* 迷路を構成するブロックを衝突判定のために保存する必要がある（後述） */
+                    const WIDTH = 4; /* 迷路データの幅 */
+                    const HEIGHT = 6;  /* 迷路データの高さ */
+                    let index = 0;
+                    for (let z = 0; z < HEIGHT; z++) {
+                        for (let x = 0; x < WIDTH; x++) {
+                            let cellType = MyMazeTestData[index];
+                            if (cellType == 1) {
+                                const tmp = new THREE.Mesh(cubeGeometry, cubeMaterial);  /* ブロックを生成 */
+                                tmp.position.set(x * 3, 1.5, z * 3);  /* 場所を設定 */
+                                scene.add(tmp); /* シーンに追加 */
+                                blocks.push(tmp); /* 配列に追加 */
+                            }
+                            index++;
+                        }
+                    }
+                    blocks.push(tableJudment);
+                    blocks.push(ClosetJudment);
+                    blocks.push(Closet2Judment);
+
+                    const hantei = [tableJudment, ClosetJudment, Closet2Judment];
+
+
+
+                    /*屋根の作成*/
+                    const cubeGeometry3 = new THREE.BoxGeometry(20, 1, 20); /* Geometry の生成を分けて書くこともできる */
+                    const cubeMaterial3 = new THREE.MeshPhongMaterial({ color: 0xFF0000 }); /* Material の生成を分けて書くこともできる */
+                    const ceiling = new THREE.Mesh(cubeGeometry3, cubeMaterial3);
+                    ceiling.position.set(5, 4, 5);
+                    scene.add(ceiling);
+
+                    /*床の生成*/
+                    const cubeGeometry4 = new THREE.BoxGeometry(7, 0.01, 13); /* Geometry の生成を分けて書くこともできる */
+                    const loader4 = new THREE.TextureLoader(); /* テクスチャをロードするための道具 */
+                    const mapTexture2 = loader4.load("../assets/downloads/81mYuxbNKVL._AC_SX355_.jpg"); /* 指定されたURLからテクスチャをロード */
+                    const bumpTexture2 = loader4.load("../assets/downloads/81mYuxbNKVL._AC_SX355_.jpg"); /* バンプマップ用テクスチャ */
+                    const cubeMaterial4 = new THREE.MeshPhongMaterial({ map: mapTexture2, bumpMap: bumpTexture2, bumpScale: 0.2 });
+                    const floorr = new THREE.Mesh(cubeGeometry4, cubeMaterial4);
+                    floorr.position.set(5, 0.01, 7);
+                    scene.add(floorr);
+
+
+
+
+
+                    /* ↑↑↑work31の追記・修正場所↑↑↑ */
+                    bodyy.position.set(4.5, 1.7, 3); /* 通行可能領域に自分を移動させている */
+                    /* ↓↓↓work31のプッシュボタンや十字キーに関する追記・修正場所↓↓↓ */
+
+                    let cube2 = null;
+                    let Correctanswer = 0; // 正解の答え
+                    let text = null; 
+
+                    let win = 0; //正解数
+                    let a = false;
+
+                    const divStatus = document.getElementById("status"); // 追記
+
+
+                    function onPushButtonClicked() {
+                        taDebugText.value += this.id + ":Pushed. value=" + this.value + "\n";
+                        const random = Math.floor(Math.random() * 9);
+                        Correctanswer = TableQ[random].A;　//正解の答え
+                        if (mylib2020.checkCollision(bodyy, hantei, mylib2020.FORWARD) == true) {
+
+                            cube2 = new THREE.Mesh(cubeGeometry2, cubeMaterial2);
+
+                            taDebugText.value += "Encounter!!\n";
+
+                            taMessage.value = '1，2，3，4のどれかを選択しよう！\n';
+
+                            let textGeometry = new THREE.TextGeometry(TableQ[random].Q, {
+                                font: nomifont0,
+                                size: 10.0,
+                                height: 1,
+                                curveSegments: 10,
+                                bevelThickness: 3,
+                                bevelSize: 1.0,
+                                bevelEnabled: true
+                            });
+                            // ジオメトリを中心に移動
+                            textGeometry.center();
+
+                            // オブジェクトの作成
+                            textMterial = new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.0 });
+                            text = new THREE.Mesh(textGeometry, textMterial);
+                            text.name = '3dtext';
+                            text.position.set(0, -0.035, 0.2);
+                            text.scale.set(0.0006, 0.0006, 0.0006);
+                            text.rotateY(THREE.Math.degToRad(180));
+                            text.rotateX(THREE.Math.degToRad(-5));
+
+                            // オブジェクトをシーンに追加
+                            scene.add(text);
+                            scene.remove(text);
+                            bodyy.add(text);
+                            var dalta = 0.1;
+                            setInterval(function () {
+                                textMterial.opacity += dalta;
+                            }, 100);
+                        }
+                    }
+                    let elems = document.getElementsByClassName("pushButton"); // class 属性に pushButton が指定してある HTML 要素を取得し、配列 elems に格納する。
+                    for (let e of elems) {
+                        e.addEventListener("click", onPushButtonClicked);
+                    }
+
+                    function onPushButtonClicked2() {
+                        
+                        taDebugText.value += this.id + ":Pushed. value=" + this.value + "\n";
+                        if (cube2 == null) {
+                            return;
+                        }
+
+                        let youranswer = parseInt(this.value); // 押されたボタンの value 属性を整数に変換
+
+                        if (youranswer == Correctanswer) {
+                            taMessage.value += "正解!!\n";
+                            divStatus.innerHTML = null;  
+                            bodyy.remove(text);
+                            cube2 = null;
+                            Correctanswer = 0;
+                            win++;
+                            divStatus.innerHTML += "正解数" + win;
+                        }
+                        else {
+                            taMessage.value += "不正解．．． 再読み込みしてください\n";
+                            divStatus.innerHTML = null;
+
+                            bodyy.remove(text);
+
+                            let textGeometry2 = new THREE.TextGeometry("脱出失敗．．．", {
+                                font: nomifont0,
+                                size: 10.0,
+                                height: 1,
+                                curveSegments: 10,
+                                bevelThickness: 3,
+                                bevelSize: 1.0,
+                                bevelEnabled: true
+                            });
+                            // ジオメトリを中心に移動
+                            textGeometry2.center();
+
+                            // オブジェクトの作成
+                            textMterial1 = new THREE.MeshBasicMaterial({ color: 0x0000ff, transparent: true, opacity: 0.0 });
+                            let text2 = new THREE.Mesh(textGeometry2, textMterial1);
+                            text2.name = '3dtext';
+                            text2.position.set(0.007, -0.035, 0.2);
+                            text2.scale.set(0.0015, 0.0015, 0.0015);
+                            text2.rotateY(THREE.Math.degToRad(180));
+                            text2.rotateX(THREE.Math.degToRad(-5));
+
+                            // オブジェクトをシーンに追加
+                            scene.add(text2);
+                            scene.remove(text2);
+                            bodyy.add(text2);
+                            var dalta = 0.1;
+                            setInterval(function () {
+                                textMterial1.opacity += dalta;
+                            }, 100);
+                        }
+                        if (win == 3) {
+                            taMessage.value += "Congratulation\nゲームクリア！．．． 再読み込みしてください";
+                            let textGeometryM = new THREE.TextGeometry("Congratulation!!", {
+                                font: nomifont0,
+                                size: 10.0,
+                                height: 1,
+                                curveSegments: 10,
+                                bevelThickness: 3,
+                                bevelSize: 1.0,
+                                bevelEnabled: true
+                            });
+                            // ジオメトリを中心に移動
+                            textGeometryM.center();
+                            // オブジェクトの作成
+                            textMterialM = new THREE.MeshBasicMaterial({ color: 0xfff100, transparent: true, opacity: 0.0 });
+                          
+                            // オブジェクトの作成
+                            let text3 = new THREE.Mesh(textGeometryM, textMterialM);
+                            text3.name = '3dtext';
+                            text3.position.set(0.002, -0.035, 0.2);
+                            text3.scale.set(0.0015, 0.0015, 0.0015);
+                            text3.rotateY(THREE.Math.degToRad(180));
+                            text3.rotateX(THREE.Math.degToRad(-5));
+
+                            // オブジェクトをシーンに追加
+                            scene.add(text3);
+                            scene.remove(text3);
+                            bodyy.add(text3);
+                            var dalta = 0.1 ;
+                            setInterval(function () {
+                                textMterialM.opacity += dalta;
+                            }, 100);
+                            cube2 = new THREE.Mesh(cubeGeometry2, cubeMaterial2);
+                        }
+                    }
+
+
+                    let elems2 = document.getElementsByClassName("pushButton2"); // class 属性に pushButton が指定してある HTML 要素を取得し、配列 elems に格納する。
+                    for (let e2 of elems2) {
+                        e2.addEventListener("click", onPushButtonClicked2);
+                    }
+
+
+                    elems = document.getElementsByClassName("gameButton"); // class 属性に gameButton が指定された HTML 要素を全て取得し、配列に格納する。
+                    const arrows = {}; // div の id と十字キーボタンクラスをペアとする辞書
+                    for (let e of elems) {
+                        arrows[e.id] = new mylib2020.ArrowButton(e, "url(../assets/red_arrow.png)");
+                        /* 十字キーボタンを生成する。第一引数はボタン領域となる HTML の div 要素、第二引数は押したときの画像 */
+                    }
+
+
+                    /*tableに着ける問題*/
+                    const tableQ1 = {
+                        Q: '問題!  ひょっこりひょうたん島の題材は？\n           1.ハワイ\n           2.えしま\n           3.さくらじま\n           4.死後の世界',
+                        A: 4
+                    }
+                    const tableQ2 = {
+                        Q: '問題!  1円玉の裏の何の木？\n           1.かくうの木\n           2.さくらの木\n           3.かれ木\n           4.ぎんなんの木',
+                        A: 1
+                    }
+                    const tableQ3 = {
+                        Q: '問題!  お坊さんがもくぎょを叩くのは何のため？\n           1.おきょうにリズムをつけるため\n           2.あくりょうがつくのを防ぐため\n           3.特に意味はない\n           4.眠らないようにするため',
+                        A: 4
+                    }
+                    const tableQ4 = {
+                        Q: '問題!  ギリシャで食べるなという意味の言葉は？\n           1.デザート\n           2.たいしゅうしょくどう\n           3.日本語と同じ\n           4.がっこうきゅうしょく',
+                        A: 2
+                    }
+                    const tableQ5 = {
+                        Q: '問題!  肉の名前の隠語で、鹿は何という？\n           1.桜肉\n           2.柏\n           3.紅葉\n           4.牡丹',
+                        A: 1
+                    }
+                    const tableQ6 = {
+                        Q: '問題!  日本で最初に売られたアイスクリームの値段は？\n           1.10000\n           2.50\n           3.8000\n           4.200',
+                        A: 3
+                    }
+                    const tableQ7 = {
+                        Q: '問題!  しろくまのはだの色は？\n           1.とうめい\n           2.くろ\n           3.はだいろ\n           4.しろ',
+                        A: 2
+                    }
+                    const tableQ8 = {
+                        Q: '問題!  次のうち日本語でないものは？\n           1.しいたけ\n           2.れんこん\n           3.おくら\n           4.だいこん',
+                        A: 3
+                    }
+                    const tableQ9 = {
+                        Q: 'パソコンのマウスの移動距離の単位は？\n           1.ミッキー\n           2.ピカチュウ\n           3.トム\n           4.ジェリー',
+                        A: 1
+                    }
+                    const tableQ10 = {
+                        Q: '問題!  次のうち続きが存在するものは？\n           1.アリとキリギリス\n           2.3匹のこぶた\n           3.ひきょうなこうもり\n           4.うさぎとかめ',
+                        A: 4
+                    }
+
+                    const TableQ = [tableQ1, tableQ2, tableQ3, tableQ4, tableQ5, tableQ6, tableQ7, tableQ8, tableQ9, tableQ10];
+
+                    let nomifont0 = null;
+                    // フォントのロード
+                    new THREE.FontLoader().load('../assets/fonts/Gen Shin Gothic Bold_Bold.json', function (font) {
+                        console.log("loaded");
+                        nomifont0 = font;
+                    });
+
+                    /* アニメーションのための描画更新処理 */
+                    /* ↓↓↓work31の追記・修正場所↓↓↓ */
+                    const LINEAR = 5; // 追記 3m/sec
+                    const ANGULAR = THREE.Math.degToRad(90); // 追記 60deg/sec
+
+                    const taMessage = document.getElementById("message");
+                    taMessage.value = '「ここは．．．？」\n気が付くと見たことのない部屋に立っていた\n「 とにかく、部屋の中を探ろう」\n 部屋にあるものを探索してクイズにこたえよう\n\n<<ルール：部屋に存在するクイズを探し、3問正解するとクリアとなります。1問でも不正解だとゲームオーバーです。>>';
+
+                    function renderFrame() {
+                        const deltaTime = clock.getDelta(); /* 前フレームからの経過時間。物体の移動に使う。 */
+
+
+
+                        if (cube2 == null) {
+
+
+                            if (arrows["up"].isPressed()) {
+                                taDebugText.value += "up\n";
+                                if (mylib2020.checkCollision(bodyy, blocks, mylib2020.FORWARD) == false) {
+                                    bodyy.translateOnAxis(mylib2020.FORWARD, LINEAR * deltaTime);
+
+                                }
+                            }
+                            if (arrows["down"].isPressed()) {
+                                taDebugText.value += "down\n";
+                                if (mylib2020.checkCollision(bodyy, blocks, mylib2020.BACK) == false) {
+                                    bodyy.translateOnAxis(mylib2020.BACK, LINEAR * deltaTime);
+
+                                }
+                            }
+                            if (arrows["left"].isPressed()) {
+                                taDebugText.value += "left\n";
+                                bodyy.rotateY(ANGULAR * deltaTime);
+
+                            }
+                            if (arrows["right"].isPressed()) {
+                                taDebugText.value += "right\n";
+                                bodyy.rotateY(-ANGULAR * deltaTime);
+
+                            }
+
+
+                        }
+
+
+
+                        /* ↑↑↑work31の追記・修正場所↑↑↑ */
+                        renderer.render(scene, camera);
+                        requestAnimationFrame(renderFrame);
+                        if (AUTO_SCROLL_DEBUG) {
+                            taDebugText.scrollTop = taDebugText.scrollHeight;
+                        }
+                    }
+                    renderFrame();
+
+                    /* 画面サイズ変更時の処理 */
+                    window.addEventListener('resize', function () {
+                        taDebugText.value += ("ViewPort: " + window.innerWidth + "," + window.innerHeight + "\n");
+                        const glViewSize = divGlView.getBoundingClientRect();
+                        renderer.setSize(glViewSize.width, glViewSize.height);
+                        camera.aspect = glViewSize.width / glViewSize.height;
+                        camera.updateProjectionMatrix();
+                    });
+                }, false);
+            window.addEventListener('load', init);
+        </script>
+</body>
